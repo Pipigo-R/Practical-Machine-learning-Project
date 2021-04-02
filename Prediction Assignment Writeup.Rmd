@@ -1,0 +1,134 @@
+---
+title: 'Peer-graded Assignment: Prediction Assignment Writeup'
+author: "Bing Hu"
+date: "March 17, 2021"
+output: html_document
+keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+This is the report generated for course project of Practical Machine Learning course from John Hopkins University on Coursera as part of Data Science specification.
+The goal of your project is to predict the manner in which they did the exercise, which is the "classe" variable in the training set. Report will include description of the problem, dataset description, variables used to build model for prediction and prediction results of applying the model.
+
+
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data Source
+The training and test data for this project are collected using the link below:
+  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+The full reference of this data is as follows:
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. "Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13)". Stuttgart, Germany: ACM SIGCHI, 2013.
+
+## Setup environment
+```{r}
+setwd("C:/Users/bingh/Documents/Coursera/JHU_Course8_Practical Machine Learning/CourseProject")
+library(caret)
+library(rpart)
+library(rpart.plot)
+set.seed(1234)
+```
+
+## Download in dataset
+```{r}
+url_train <- "pml-training.csv"
+rawtraining <- read.csv(url_train, na.strings = c("", "NA"))
+url_test <- "pml-testing.csv"
+rawtesting <- read.csv(url_test, na.strings = c("", "NA"))
+dim(rawtraining)
+dim(rawtesting)
+```
+## Clean Data
+To avoid error, data cleaning process to remove NA and near-zero-variance (NZV) variables is needed. 
+```{r}
+nzv_var <- nearZeroVar(rawtraining)
+rawtraining <- rawtraining[ , -nzv_var]
+dim(rawtraining)
+#Remove NA cols
+colname <- colnames(rawtraining)[!colSums(is.na(rawtraining)) > 0]
+colname
+#Slice data relatd with exercise
+colname <- colname[8: length(colname)]
+training0 <- rawtraining[colname]
+```
+
+## Split data
+create a partition using caret with the training dataset on 70,30 ratio
+
+```{r}
+inTrain  <- createDataPartition(training0$classe, p=0.7, list=FALSE)
+training <- training0[inTrain, ]
+testing  <- training0[-inTrain, ]
+dim(training)
+dim(testing)
+```
+
+## Apply different Prediction model
+### create a partition using caret with the training dataset on 70,30 ratio
+
+```{r}
+inTrain  <- createDataPartition(training0$classe, p=0.7, list=FALSE)
+training <- training0[inTrain, ]
+testing  <- training0[-inTrain, ]
+dim(training)
+dim(testing)
+colnames(training)
+```
+
+### Model 1: Linear Discriminant Analysis
+```{r}
+model_lda <- train(classe ~ ., data = training, method = "lda")
+pred_lda <- predict(model_lda, testing)
+confusionMatrix_lda <- confusionMatrix(pred_lda, factor(testing$classe))
+confusionMatrix_lda
+```
+The The predictive accuracy of the linear discriminant model is 
+`r round(confusionMatrix_lda$overall['Accuracy'], 4)`
+
+### Model 2: Dicision Tree Model
+```{r}
+set.seed(1234)
+pred_dtree <- rpart(classe ~ ., data = training, method="class")
+rpart.plot(pred_dtree)
+```
+Predictions of the decision tree model on test data
+
+```{r}
+pred_decision_tree <- predict(pred_dtree, newdata = testing, type="class")
+confmatrix_dt <- confusionMatrix(pred_decision_tree, factor(testing$classe))
+confmatrix_dt
+```
+Plot the predictive accuracy of the decision tree model.
+```{r}
+plot(confmatrix_dt$table, col = confmatrix_dt$byClass, 
+     main = paste("Decision Tree Model: Predictive Accuracy =",
+                  round(confmatrix_dt$overall['Accuracy'], 4)))
+```
+
+The The predictive accuracy of the linear discriminant model is 
+`r round(confmatrix_dt$overall['Accuracy'], 4)`
+
+### Model 3: Radom Tree Model
+```{r}
+model_rf <- train(classe ~ ., data = training, method = "rf")
+model_rf$finalModel
+pred_rf <- predict(model_rf, newdata=testing)
+confmatrix_rf <- confusionMatrix(pred_rf, factor(testing$classe))
+confmatrix_rf
+
+```
+
+## The Random Forest model is selected and applied to make predictions on the 20 data points from the original testing dataset 
+```{r}
+predict_test <- as.data.frame(predict(model_rf, newdata = rawtesting))
+predict_test
+```
+
+
